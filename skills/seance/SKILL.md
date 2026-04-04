@@ -2,7 +2,10 @@
 name: seance
 description: Commune with past local agent sessions. Use for recalling past work, exploring session history, finding previous sessions, or resurrecting abandoned work. Use this whenever the user asks about previous work, past sessions, what they were doing before, or wants to continue something they started earlier.
 argument-hint: "[question or resurrect target]"
+arguments:
+  - query
 license: MIT
+effort: medium
 allowed-tools: Bash Read Write Task
 ---
 
