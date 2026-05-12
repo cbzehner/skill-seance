@@ -1,4 +1,4 @@
 interface:
   display_name: "Seance"
-  short_description: "Search past local agent sessions and resume work"
-  default_prompt: "Use $seance to find the relevant past session and reconstruct what happened."
+  short_description: "Search past sessions, transcripts, and logs"
+  default_prompt: "Use $seance to find the relevant past session logs and reconstruct what happened."

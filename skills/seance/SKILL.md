@@ -1,6 +1,12 @@
 ---
 name: seance
-description: Commune with past local agent sessions. Use for recalling past work, exploring session history, finding previous sessions, or resurrecting abandoned work. Use this whenever the user asks about previous work, past sessions, what they were doing before, or wants to continue something they started earlier.
+description: >-
+  Search and summarize past local agent sessions, transcripts, and session logs.
+  Use for recalling previous work, checking what happened in earlier sessions,
+  exploring session history, finding prior decisions or commands, resurrecting
+  abandoned work, or continuing something the user started before. Trigger when
+  the user says "session logs", "past sessions", "what did we do before", "find
+  the session", "resurrect", or asks to investigate prior agent behavior.
 argument-hint: "[question or resurrect target]"
 arguments:
   - query
