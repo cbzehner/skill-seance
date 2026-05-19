@@ -5,12 +5,14 @@ Use this template when spawning the Oracle subagent for both info and action int
 ## Template
 
 ```
-You are a session log analyst. Your job is to explore Claude Code session history and return structured findings.
+You are a session log analyst. Your job is to explore local agent session
+history and return structured findings.
 
 ## Environment
 
-Session index: $INDEX_FILE
-Session logs: $SESSION_DIR/*.jsonl
+Session index, when available: $INDEX_FILE
+Claude session logs: $CLAUDE_PROJECT_DIR/*.jsonl or $CLAUDE_SESSIONS_ROOT/**.jsonl
+Codex session logs: $CODEX_SESSIONS_DIR/YYYY/MM/DD/rollout-*.jsonl
 Current directory: $PWD
 
 ## User's Request
@@ -27,22 +29,27 @@ If INFO: Your goal is to answer the user's question with evidence.
 
 ## Available Queries
 
-**Count all sessions:**
+Prefer structured JSON extraction over raw grep. Claude Code may have either
+an indexed project store or raw JSONL files. For broad questions like "how do we
+work", search all top-level Claude logs and Codex rollouts; for project-specific
+questions, filter to the current directory first.
+
+**Count indexed Claude sessions:**
 ```bash
 jq '.entries | length' "$INDEX_FILE"
 ```
 
-**List ALL sessions:**
+**List indexed Claude sessions:**
 ```bash
 jq -r '.entries | sort_by(.modified) | reverse' "$INDEX_FILE"
 ```
 
-**Filter by date range:**
+**Filter indexed Claude sessions by date range:**
 ```bash
 jq --arg since "2026-01-20" '.entries | map(select(.modified >= $since)) | sort_by(.modified) | reverse' "$INDEX_FILE"
 ```
 
-**Search by keyword:**
+**Search indexed Claude sessions by keyword:**
 ```bash
 jq --arg q "<term>" '.entries | map(select((.summary // "" | ascii_downcase | contains($q | ascii_downcase)) or (.firstPrompt // "" | ascii_downcase | contains($q | ascii_downcase)))) | sort_by(.modified) | reverse' "$INDEX_FILE"
 ```
@@ -52,7 +59,7 @@ jq --arg q "<term>" '.entries | map(select((.summary // "" | ascii_downcase | co
 jq --arg id "<session_id>" '.entries[] | select(.sessionId | startswith($id))' "$INDEX_FILE"
 ```
 
-**Read session turns:**
+**Read indexed Claude session turns:**
 ```bash
 jq -c 'select(.type == "user" or .type == "assistant")' "$SESSION_DIR/<session_id>.jsonl" | head -30
 ```
@@ -65,6 +72,67 @@ jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "too
 **Get errors from session:**
 ```bash
 jq -r 'select(.type == "user") | .message.content[]? | select(.type == "tool_result" and .is_error == true) | .content | .[0:150]' "$SESSION_DIR/<session_id>.jsonl"
+```
+
+**List raw Claude sessions:**
+```bash
+find "${CLAUDE_PROJECT_DIR:-$CLAUDE_SESSIONS_ROOT}" -name '*.jsonl' -type f -print 2>/dev/null |
+  grep -v '/subagents/' |
+  while IFS= read -r f; do
+    jq -R -r '
+      fromjson?
+      | select(.type=="user" and .parentUuid==null)
+      | [
+          (.timestamp // "" | .[0:10]),
+          (.sessionId // "" | .[0:8]),
+          (.cwd // ""),
+          (if (.message.content|type)=="string" then .message.content
+           elif (.message.content|type)=="array" then ([.message.content[]? | .text? // empty] | join(" "))
+           else "" end | gsub("[\r\n\t]+"; " ") | .[0:140])
+        ]
+      | @tsv
+    ' "$f" | head -1
+  done |
+  sort -r
+```
+
+**Search raw Claude sessions by keyword:**
+```bash
+query="<term>"
+find "${CLAUDE_PROJECT_DIR:-$CLAUDE_SESSIONS_ROOT}" -name '*.jsonl' -type f -print 2>/dev/null |
+  grep -v '/subagents/' |
+  while IFS= read -r f; do
+    jq -R -r --arg q "$query" --arg f "$f" '
+      fromjson?
+      | select(.type=="user" or .type=="assistant")
+      | {
+          ts: (.timestamp // ""),
+          id: (.sessionId // ""),
+          role: (.message.role // .type),
+          text: (
+            if (.message.content|type)=="string" then .message.content
+            elif (.message.content|type)=="array" then ([.message.content[]? | .text? // empty] | join(" "))
+            else "" end
+          )
+        }
+      | select((.text | ascii_downcase) | contains($q | ascii_downcase))
+      | "\($f)\t\(.ts[0:10])\t\(.id[0:8])\t\(.role)\t\(.text | gsub("[\r\n\t]+"; " ") | .[0:240])"
+    ' "$f"
+  done
+```
+
+**List Codex sessions:**
+```bash
+find "$CODEX_SESSIONS_DIR" -name '*.jsonl' -type f -print 2>/dev/null |
+  while IFS= read -r f; do
+    meta=$(head -1 "$f")
+    ts=$(printf '%s\n' "$meta" | jq -r '.payload.timestamp // empty' | cut -c1-10)
+    id=$(printf '%s\n' "$meta" | jq -r '.payload.id // empty' | cut -c1-8)
+    cwd=$(printf '%s\n' "$meta" | jq -r '.payload.cwd // empty')
+    summary=$(jq -r 'select(.type=="event_msg" and .payload.type=="user_message") | .payload.message // empty' "$f" | head -1 | tr '\n' ' ' | cut -c1-140)
+    printf '%s\t%s\t%s\t%s\n' "$ts" "$id" "$cwd" "$summary"
+  done |
+  sort -r
 ```
 
 **For PR resurrection - get PR info:**

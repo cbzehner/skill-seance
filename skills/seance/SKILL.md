@@ -38,13 +38,27 @@ All paths except quick list use the same Oracle engine. The word "resurrect" sig
 ## Path Resolution
 
 Detect which session store is available. Try both; use whichever has data.
+If the current project has no local session directory and the user asks about
+general working patterns, search all local agent sessions instead of returning
+"No sessions found."
 
 ### Claude Code sessions
 
 ```
-SESSION_DIR=!`echo "$HOME/.claude/projects/$(echo "$PWD" | sed 's|/|-|g')"`
-INDEX_FILE=!`echo "$HOME/.claude/projects/$(echo "$PWD" | sed 's|/|-|g')/sessions-index.json"`
+CLAUDE_PROJECT_DIR="$HOME/.claude/projects/$(printf '%s' "$PWD" | sed 's|/|-|g')"
+INDEX_FILE="$CLAUDE_PROJECT_DIR/sessions-index.json"
+CLAUDE_SESSIONS_ROOT="$HOME/.claude/projects"
 ```
+
+Claude stores may be either indexed or raw JSONL:
+
+- Indexed project store: `$CLAUDE_PROJECT_DIR/sessions-index.json`
+- Raw project store: `$CLAUDE_PROJECT_DIR/*.jsonl`
+- Raw global store: `$CLAUDE_SESSIONS_ROOT/**.jsonl`
+
+Ignore `*/subagents/*.jsonl` for top-level session lists unless the user asks
+about delegated agent work. Subagent logs are useful evidence, but including
+them by default double-counts sessions.
 
 ### Codex sessions
 
@@ -79,11 +93,14 @@ Useful Codex event shapes:
 ### Resolution order
 
 1. If `$INDEX_FILE` exists and has entries → use Claude Code store
-2. Else if `$CODEX_SESSIONS_DIR` exists → scan Codex JSONL files
-3. Else → "No sessions found"
+2. Else if `$CLAUDE_PROJECT_DIR/*.jsonl` exists → scan current-project Claude JSONL files
+3. Else if the user asks about broad patterns, history, or "how we work" and
+   `$CLAUDE_SESSIONS_ROOT` exists → scan all top-level Claude JSONL files
+4. Else if `$CODEX_SESSIONS_DIR` exists → scan Codex JSONL files
+5. Else → "No sessions found"
 
-Set `SESSION_BACKEND` to `claude` or `codex` so downstream steps know which
-format to parse.
+Set `SESSION_BACKEND` to `claude_index`, `claude_jsonl`, `claude_global_jsonl`,
+or `codex` so downstream steps know which format to parse.
 
 ---
 
@@ -93,9 +110,31 @@ When user runs `/seance` with no arguments:
 
 **Claude Code backend:**
 ```bash
-jq -r '.entries | sort_by(.modified) | reverse | .[:10][] |
-  "\(.modified | .[0:10])  \(.sessionId | .[0:8])  \(.messageCount // 0 | tostring | if length < 3 then " " * (3 - length) + . else . end) msgs  \(.summary // .firstPrompt // "No summary" | .[0:55])"' \
-  "$INDEX_FILE" 2>/dev/null || echo "No sessions found"
+if [ -f "$INDEX_FILE" ]; then
+  jq -r '.entries | sort_by(.modified) | reverse | .[:10][] |
+    "\(.modified | .[0:10])  \(.sessionId | .[0:8])  \(.messageCount // 0 | tostring | if length < 3 then " " * (3 - length) + . else . end) msgs  \(.summary // .firstPrompt // "No summary" | .[0:55])"' \
+    "$INDEX_FILE" 2>/dev/null
+else
+  find "${CLAUDE_PROJECT_DIR:-$HOME/.claude/projects}" -name '*.jsonl' -type f -print 2>/dev/null |
+    grep -v '/subagents/' |
+    while IFS= read -r f; do
+      jq -R -r '
+        fromjson?
+        | select(.type=="user" and .parentUuid==null)
+        | [
+            (.timestamp // "" | .[0:10]),
+            (.sessionId // "" | .[0:8]),
+            (if (.message.content|type)=="string" then .message.content
+             elif (.message.content|type)=="array" then ([.message.content[]? | .text? // empty] | join(" "))
+             else "No summary" end | gsub("[\r\n\t]+"; " ") | .[0:55])
+          ]
+        | @tsv
+      ' "$f" | head -1
+    done |
+    sort -r |
+    head -10 |
+    awk -F '\t' '{printf "%s  %s       msgs  %s\n", $1, $2, $3}'
+fi
 ```
 
 **Codex backend:**
@@ -160,7 +199,7 @@ For info-intent questions, check if time scope is ambiguous:
 
 ### Dispatch Oracle Subagent
 
-**Claude Code:** Use a Task subagent with the Claude session index.
+**Claude Code indexed store:** Use a Task subagent with the Claude session index.
 ```
 Task:
   subagent_type: "general-purpose"
@@ -168,10 +207,37 @@ Task:
   prompt: [see oracle-prompt.md — substitute $INDEX_FILE, $SESSION_DIR, <USER_INPUT>, and <INFO|ACTION>]
 ```
 
-**Codex / other hosts:** Run the oracle inline or as a lightweight subprocess.
-For Codex, search the rollout JSONL directly. Prefer structured `jq` extraction
-over raw grep so base instructions, encrypted reasoning, token counts, and
-tool-output noise do not dominate results.
+**Claude raw JSONL / Codex / other hosts:** Run the oracle inline or as a
+lightweight subprocess. Prefer structured `jq` extraction over raw grep so base
+instructions, encrypted reasoning, token counts, and tool-output noise do not
+dominate results.
+
+**Claude JSONL search recipe:**
+```bash
+query='<USER_QUERY>'
+root="${CLAUDE_PROJECT_DIR:-$HOME/.claude/projects}"
+find "$root" -name '*.jsonl' -type f -print 2>/dev/null |
+  grep -v '/subagents/' |
+  while IFS= read -r f; do
+    jq -R -r --arg q "$query" --arg f "$f" '
+      fromjson?
+      | select(.type=="user" or .type=="assistant")
+      | {
+          ts: (.timestamp // ""),
+          id: (.sessionId // ""),
+          role: (.message.role // .type),
+          cwd: (.cwd // ""),
+          text: (
+            if (.message.content|type)=="string" then .message.content
+            elif (.message.content|type)=="array" then ([.message.content[]? | .text? // empty] | join(" "))
+            else "" end
+          )
+        }
+      | select((.text | ascii_downcase) | contains($q | ascii_downcase))
+      | "\($f)\t\(.ts[0:10])\t\(.id[0:8])\t\(.role)\t\(.text | gsub("[\r\n\t]+"; " ") | .[0:240])"
+    ' "$f"
+  done
+```
 
 **Codex search recipe:**
 ```bash
