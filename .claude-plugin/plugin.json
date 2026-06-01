@@ -1,10 +1,10 @@
 {
   "name": "seance",
-  "description": "Commune with past Claude Code sessions. Use for recalling past work, exploring session history, or resurrecting abandoned tasks.",
+  "description": "Search and summarize past local agent sessions, transcripts, and session logs. Use for recalling previous work, checking what happened in earlier sessions, exploring session history, finding prior decisions or commands, resurrecting abandoned work, or continuing something the user started before. Trigger when the user says \"session logs\", \"past sessions\", \"what did we do before\", \"find the session\", \"resurrect\", or asks to investigate prior agent behavior.",
   "version": "1.0.0",
   "author": {
     "name": "cbzehner",
-    "email": "chris@cbzehner.com"
+    "url": "https://github.com/cbzehner"
   },
   "repository": "https://github.com/cbzehner/skill-seance",
   "license": "MIT"

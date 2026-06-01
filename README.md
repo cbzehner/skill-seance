@@ -1,73 +1,59 @@
 # Seance
 
-Commune with your past Claude Code sessions.
+Search and summarize past local agent sessions, transcripts, and session logs. Use for recalling previous work, checking what happened in earlier sessions, exploring session history, finding prior decisions or commands, resurrecting abandoned work, or continuing something the user started before. Trigger when the user says "session logs", "past sessions", "what did we do before", "find the session", "resurrect", or asks to investigate prior agent behavior.
 
-## What It Does
+## Skill
 
-Seance explores your session history through conversation. Ask questions about past work, find patterns, or resurrect abandoned tasks with an actionable plan.
+This repository packages one portable agent skill:
 
-## Usage
+- `seance` - Search and summarize past local agent sessions, transcripts, and session logs. Use for recalling previous work, checking what happened in earlier sessions, exploring session history, finding prior decisions or commands, resurrecting abandoned work, or continuing something the user started before. Trigger when the user says "session logs", "past sessions", "what did we do before", "find the session", "resurrect", or asks to investigate prior agent behavior.
 
-```
-/seance                      → Quick list of recent sessions
-/seance <question>           → Oracle explores and answers
-/seance resurrect <target>   → Replan to continue work
-```
+The canonical skill body lives at `skills/seance/SKILL.md`. Keep behavior changes there; keep this README focused on installation and packaging.
 
-## Examples
+## Install
 
-```
-/seance
-→ Shows your 10 most recent sessions
-
-/seance what was I working on last week?
-→ Searches sessions, synthesizes a summary
-
-/seance why does the auth module keep breaking?
-→ Finds error patterns across sessions
-
-/seance resurrect abc123
-→ Analyzes session, creates plan to continue
-
-/seance resurrect #42
-→ Checks PR status, plans next steps
-
-/seance resurrect feature-branch
-→ Reviews branch progress, plans completion
-```
-
-## How It Works
-
-**Quick List**: Direct jq query, instant.
-
-**Oracle**: Spawns a Haiku subagent that explores session logs, returns structured findings. Main thread synthesizes into a conversational answer with citations.
-
-**Resurrect**: Same Oracle engine, but with action intent. Gathers context from session/PR/branch, checks current state, generates an actionable plan to continue.
-
-## Installation
-
-### From Marketplace
+Clone the repository, then run the installer:
 
 ```bash
-# Add the marketplace
-/plugin marketplace add cbzehner/skill-seance
-
-# Install the skill
-/plugin install seance@cbzehner
+git clone https://github.com/cbzehner/skill-seance.git
+cd skill-seance
+./install.sh all
 ```
 
-### Manual Installation
+Install targets:
 
-```bash
-cd ~/.claude/skills/
-git clone https://github.com/cbzehner/skill-seance.git seance
+- `./install.sh claude` -> `~/.claude/skills/seance`
+- `./install.sh codex` -> `~/.codex/skills/seance`
+- `./install.sh agents` -> `~/.agents/skills/seance` for generic agent harnesses such as Pi/Hermes-style setups
+- `./install.sh opencode` -> `~/.config/opencode/skills/seance`
+- `./install.sh all --copy` copies files instead of symlinking
+
+Manual installation is just a symlink or copy from `skills/seance` into your agent's skills directory.
+
+## Compatibility
+
+This repo uses the common `skills/<name>/SKILL.md` layout so agents that understand file-based skills can load it directly. Host-specific metadata is included where useful:
+
+- Claude Code: `.claude-plugin/plugin.json` and direct `~/.claude/skills` install
+- Codex CLI: `.codex-plugin/plugin.json` with `skills: "./skills/"` and direct `~/.codex/skills` install
+- Other agents: direct install to the agent's skills directory; unsupported frontmatter fields can be ignored
+
+Some skills mention optional host tools such as `Task`, `Agent`, `Skill`, MCP tools, or browser automation CLIs. On hosts that do not provide those tools, adapt to equivalent local capabilities and keep the same workflow intent.
+
+## Public Safety
+
+These repositories are public. Do not commit organization-specific instructions, private repository names, secrets, tokens, cookies, raw session logs, customer data, or machine-local paths. Use environment variables and generic paths in examples.
+
+## Repository Layout
+
+```text
+.claude-plugin/plugin.json   # Claude plugin metadata
+.codex-plugin/plugin.json    # Codex plugin metadata
+install.sh                   # Symlink/copy installer for common agent skill dirs
+skills/seance/SKILL.md
+README.md
+LICENSE
 ```
-
-## Requirements
-
-- `jq` for JSON parsing (`brew install jq`)
-- `gh` for PR resurrection (`brew install gh`)
-- Claude Code session logs (created when you use Claude Code)
 
 ## License
 
