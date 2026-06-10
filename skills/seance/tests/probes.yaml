@@ -1,0 +1,40 @@
+probes:
+  # Should-trigger: recover a command from an earlier conversation
+  - prompt: "What was that jq one-liner you ran last Thursday to dedupe the vault index? It worked great and I never wrote it down."
+    expected_skills: ["seance"]
+  # Should-trigger: pick up abandoned work and continue it
+  - prompt: "A couple weeks ago we started migrating skill-ralph to the new frontmatter format and I never finished. Figure out where that left off and let's pick it back up."
+    expected_skills: ["seance"]
+  # Should-trigger: recall a decision made in an earlier conversation
+  - prompt: "Did we already settle on SQLite vs DuckDB for the bookmark importer? I remember hashing it out with you in another chat but I can't remember which way we went."
+    expected_skills: ["seance"]
+  # Should-trigger: quick listing of recent agent activity in this repo
+  - prompt: "Give me a rundown of the last ten things I've worked on with you in ~/Developer/Personal."
+    expected_skills: ["seance"]
+  # Should-trigger: investigate what the agent did in a previous run
+  - prompt: "I think Claude nuked a test file during one of our earlier conversations in the evolver repo. Can you dig through what it actually did that day?"
+    expected_skills: ["seance"]
+  # Should-trigger: cross-conversation pattern analysis of repeated failures
+  - prompt: "The restate smoke test has broken on us like three separate times now. Look back at our earlier attempts and tell me what we keep changing each time."
+    expected_skills: ["seance"]
+  # Should-trigger: Codex rollout recall
+  - prompt: "I prototyped the digest parser in a Codex run yesterday in this directory. Pull up what it concluded about the export format before I redo the work."
+    expected_skills: ["seance"]
+  # Near-miss: git history / regression hunting belongs to the git skill
+  - prompt: "Something regressed in the scrubbing regex between last week and now. Bisect the repo and find the commit that broke it."
+    expected_skills: ["git"]
+  # Near-miss: searching written notes belongs to qmd, not agent history
+  - prompt: "Search my vault notes for anything I wrote down about agentic search patterns."
+    expected_skills: ["qmd"]
+  # Near-miss: curating durable memory for later, not retrieving history
+  - prompt: "We finally figured out the deploy quirk today — capture that somewhere durable so future work in this repo doesn't trip on it again."
+    expected_skills: ["repo-memory"]
+  # Near-miss: continuation via a portable prompt is handoff territory
+  - prompt: "Write me a prompt I can paste into a fresh agent so it can continue the importer work cold, without any of this context."
+    expected_skills: ["handoff"]
+  # Near-miss: shell history is explicitly out of scope; no skill applies
+  - prompt: "What was the curl command I ran in my terminal this morning? Check my zsh history."
+    expected_skills: []
+  # Near-miss: answer is in the current conversation, no search needed
+  - prompt: "Earlier in this same conversation you mentioned a jq flag for raw output — which one was it again?"
+    expected_skills: []
