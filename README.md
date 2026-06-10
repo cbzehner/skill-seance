@@ -1,3 +1,5 @@
+> **Moved:** this skill now lives in [cbzehner/skills](https://github.com/cbzehner/skills) under `skills/seance/`. This repo is archived and read-only.
+
 # Seance
 
 Search and summarize past local agent sessions. Use it to recover prior decisions, abandoned work, commands that were run, or context that only exists in transcripts.
